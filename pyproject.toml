@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "jaymd-winnow"
-version = "0.1.1"
+version = "0.1.2"
 description = "Adaptive model lifecycle for financial signal selection and prediction"
 readme = "README.md"
 license = "MIT"

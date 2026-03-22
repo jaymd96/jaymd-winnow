@@ -21,10 +21,34 @@ def compute_shap_importances(
     Returns:
         Feature importances, shape (n_features,).
     """
+    # Use a subsample for background to keep SHAP fast
+    max_bg = min(100, X.shape[0])
+    background = X[:max_bg]
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        explainer = shap.Explainer(model, X)
-        shap_values = explainer(X)
+
+        # Try specialized explainers first, fall back to model-agnostic
+        inner_model = model.named_steps.get("model") if isinstance(model, Pipeline) else model
+
+        try:
+            # For tree-based models, use TreeExplainer (fast)
+            explainer = shap.TreeExplainer(inner_model)
+            X_for_shap = model.named_steps["scaler"].transform(X) if isinstance(model, Pipeline) else X
+        except Exception:
+            # Fall back to model-agnostic explainer using Pipeline.predict
+            masker = shap.maskers.Independent(background)
+            predict_fn = model.predict
+            try:
+                # Check if model supports predict_proba (classifiers)
+                model.predict_proba
+                predict_fn = model.predict_proba
+            except AttributeError:
+                pass
+            explainer = shap.Explainer(predict_fn, masker)
+            X_for_shap = X
+
+        shap_values = explainer(X_for_shap)
 
     vals = shap_values.values
     # For multiclass: (n_samples, n_features, n_classes) → mean over classes

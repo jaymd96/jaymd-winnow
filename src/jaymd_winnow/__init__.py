@@ -1,6 +1,6 @@
 """jaymd-winnow: Adaptive model lifecycle for financial signal selection and prediction."""
 
-__version__ = "0.1.1"
+__version__ = "0.1.2"
 
 from jaymd_winnow.pipeline import AdaptivePipeline
 from jaymd_winnow.trace import PipelineTrace
