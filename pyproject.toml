@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jaymd-winnow"
+version = "0.1.0"
+description = "Adaptive model lifecycle for financial signal selection and prediction"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "jaymd96-fmp" }]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.11",
+    "scikit-learn>=1.5",
+    "joblib>=1.3",
+    "ruptures>=1.1",
+    "mapie>=1.0",
+    "shap>=0.43",
+    "lightgbm>=4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.urls]
+Homepage = "https://github.com/jaymd96-fmp/jaymd-winnow"
+Repository = "https://github.com/jaymd96-fmp/jaymd-winnow"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jaymd_winnow"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["src", "*.egg-info"]
