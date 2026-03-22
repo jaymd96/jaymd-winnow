@@ -556,3 +556,36 @@ class TestCacheAfterRetrain:
         # (this is a weak assertion — mainly verifying the pipeline adapts at all)
         assert np.isfinite(early_mean)
         assert np.isfinite(late_mean)
+
+
+class TestDecayHalflifePipeline:
+    """Integration test: pipeline with exponential decay sample weighting."""
+
+    def test_regression_with_decay(self):
+        X, Y, _ = make_regime_switching_data(
+            n_samples=300, n_features=30, n_relevant=3,
+            n_regimes=2, noise_std=0.5, seed=42,
+        )
+        config = PipelineConfig(
+            targets=[TargetConfig(
+                name="target", task="regression",
+                model=ModelConfig(cv_folds=3, confidence_levels=[0.9], decay_halflife=50),
+            )],
+            min_history=150,
+            clustering=ClusteringConfig(max_clusters=10, update_frequency=500),
+            screening=ScreeningConfig(threshold=0.3, n_bootstraps=20, cv_folds=3, update_frequency=500),
+            monitor=MonitorConfig(pit_window=30, shap_frequency=500),
+            retraining=RetrainingConfig(cooldown_steps=100, min_regime_size=30),
+        )
+        p = AdaptivePipeline(config)
+
+        for i in range(len(X)):
+            targets = Y[i:i+1] if i > 0 else None
+            result = p.step(i, X[i], targets=targets)
+
+        assert p.is_warm
+        post_warmup = [r for r in [result] if not r.is_warmup and r.predictions]
+        assert len(post_warmup) > 0
+        pred = post_warmup[0].predictions["target"]
+        assert pred.point is not None
+        assert np.all(np.isfinite(pred.point))

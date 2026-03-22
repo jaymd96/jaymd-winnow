@@ -5,6 +5,7 @@ import pytest
 
 from jaymd_winnow.config import ModelConfig, RegimeConfig
 from jaymd_winnow.phases.modelling import (
+    _compute_decay_weights,
     build_base_model,
     conformalise_model,
     detect_regimes,
@@ -122,3 +123,59 @@ class TestRegimeDetection:
         config = RegimeConfig(custom_cost=custom, penalty=10.0, min_segment_size=20)
         bps = detect_regimes(y, config)
         assert isinstance(bps, list)
+
+
+class TestDecayWeights:
+    def test_none_when_no_halflife(self):
+        assert _compute_decay_weights(100, None) is None
+
+    def test_shape(self):
+        w = _compute_decay_weights(500, 126)
+        assert w.shape == (500,)
+
+    def test_newest_is_one(self):
+        w = _compute_decay_weights(500, 126)
+        assert abs(w[-1] - 1.0) < 1e-10
+
+    def test_halflife_means_half(self):
+        halflife = 126
+        w = _compute_decay_weights(500, halflife)
+        # The sample exactly halflife steps ago should have weight ~0.5
+        assert abs(w[-1 - halflife] - 0.5) < 1e-10
+
+    def test_oldest_decayed(self):
+        w = _compute_decay_weights(500, 126)
+        assert w[0] < 0.1  # 500 steps ago ≈ ~4 half-lives → ~0.06
+
+    def test_monotonically_increasing(self):
+        w = _compute_decay_weights(100, 50)
+        assert np.all(np.diff(w) >= 0)
+
+
+class TestDecayWeightedModels:
+    """All model_type × task combos with decay_halflife enabled."""
+
+    @pytest.mark.parametrize("model_type", ["elastic_net", "lightgbm", "ensemble"])
+    def test_regression_with_decay(self, regression_data, model_type):
+        X, y = regression_data
+        config = ModelConfig(model_type=model_type, cv_folds=3, decay_halflife=50)
+        pipe = build_base_model(X, y, "regression", config)
+        preds = pipe.predict(X[:5])
+        assert preds.shape == (5,)
+        assert np.all(np.isfinite(preds))
+
+    @pytest.mark.parametrize("model_type", ["elastic_net", "lightgbm", "ensemble"])
+    def test_binary_with_decay(self, binary_data, model_type):
+        X, y = binary_data
+        config = ModelConfig(model_type=model_type, cv_folds=3, decay_halflife=50)
+        pipe = build_base_model(X, y, "binary", config)
+        preds = pipe.predict(X[:5])
+        assert preds.shape == (5,)
+
+    @pytest.mark.parametrize("model_type", ["elastic_net", "lightgbm", "ensemble"])
+    def test_multiclass_with_decay(self, multiclass_data, model_type):
+        X, y = multiclass_data
+        config = ModelConfig(model_type=model_type, cv_folds=3, decay_halflife=50)
+        pipe = build_base_model(X, y, "multiclass", config)
+        preds = pipe.predict(X[:5])
+        assert preds.shape == (5,)

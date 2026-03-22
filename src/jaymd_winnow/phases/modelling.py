@@ -1,6 +1,7 @@
 """Phase 3: Model factory, conformal wrapping, and regime detection."""
 
 import warnings
+from typing import Optional
 
 import numpy as np
 import ruptures as rpt
@@ -14,6 +15,24 @@ from jaymd_winnow.config import ModelConfig, RegimeConfig
 # Model factory
 # ---------------------------------------------------------------------------
 
+def _compute_decay_weights(n: int, halflife: Optional[int]) -> Optional[np.ndarray]:
+    """Compute exponential decay sample weights.
+
+    Args:
+        n: Number of samples (index 0 = oldest, index n-1 = most recent).
+        halflife: Half-life in steps. None returns None (uniform weighting).
+
+    Returns:
+        Weight vector of shape (n,) where newest sample = 1.0 and the sample
+        `halflife` steps ago = 0.5. None if halflife is None.
+    """
+    if halflife is None:
+        return None
+    decay_rate = np.log(2) / halflife
+    steps_ago = np.arange(n)[::-1]  # [n-1, n-2, ..., 1, 0]
+    return np.exp(-decay_rate * steps_ago)
+
+
 def build_base_model(
     X_train: np.ndarray,
     y_train: np.ndarray,
@@ -23,23 +42,29 @@ def build_base_model(
     """Fit and return a sklearn Pipeline based on model_type.
 
     The returned Pipeline always has ("scaler", StandardScaler()) as the first step.
+    If config.decay_halflife is set, older training samples are exponentially
+    down-weighted during fitting.
     """
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_train)
+    weights = _compute_decay_weights(len(y_train), config.decay_halflife)
 
     if config.model_type == "elastic_net":
-        model = _build_linear(X_scaled, y_train, task, config)
+        model = _build_linear(X_scaled, y_train, task, config, weights)
     elif config.model_type == "lightgbm":
-        model = _build_lightgbm(X_scaled, y_train, task, config)
+        model = _build_lightgbm(X_scaled, y_train, task, config, weights)
     elif config.model_type == "ensemble":
-        model = _build_ensemble(X_scaled, y_train, task, config)
+        model = _build_ensemble(X_scaled, y_train, task, config, weights)
     else:
         raise ValueError(f"Unknown model_type: {config.model_type}")
 
     return Pipeline([("scaler", scaler), ("model", model)])
 
 
-def _build_linear(X: np.ndarray, y: np.ndarray, task: str, config: ModelConfig):
+def _build_linear(
+    X: np.ndarray, y: np.ndarray, task: str, config: ModelConfig,
+    sample_weight: Optional[np.ndarray] = None,
+):
     if task == "regression":
         from sklearn.linear_model import ElasticNetCV
         model = ElasticNetCV(l1_ratio=config.l1_ratios, cv=config.cv_folds)
@@ -61,11 +86,14 @@ def _build_linear(X: np.ndarray, y: np.ndarray, task: str, config: ModelConfig):
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        model.fit(X, y)
+        model.fit(X, y, sample_weight=sample_weight)
     return model
 
 
-def _build_lightgbm(X: np.ndarray, y: np.ndarray, task: str, config: ModelConfig):
+def _build_lightgbm(
+    X: np.ndarray, y: np.ndarray, task: str, config: ModelConfig,
+    sample_weight: Optional[np.ndarray] = None,
+):
     try:
         import lightgbm as lgb
     except ImportError:
@@ -83,15 +111,18 @@ def _build_lightgbm(X: np.ndarray, y: np.ndarray, task: str, config: ModelConfig
     else:
         raise ValueError(f"Unknown task: {task}")
 
-    model.fit(X, y)
+    model.fit(X, y, sample_weight=sample_weight)
     return model
 
 
-def _build_ensemble(X: np.ndarray, y: np.ndarray, task: str, config: ModelConfig):
+def _build_ensemble(
+    X: np.ndarray, y: np.ndarray, task: str, config: ModelConfig,
+    sample_weight: Optional[np.ndarray] = None,
+):
     from sklearn.ensemble import VotingClassifier, VotingRegressor
 
-    linear = _build_linear(X, y, task, config)
-    tree = _build_lightgbm(X, y, task, config)
+    linear = _build_linear(X, y, task, config, sample_weight)
+    tree = _build_lightgbm(X, y, task, config, sample_weight)
     weights = config.ensemble_weights
 
     named_estimators = [("linear", linear), ("tree", tree)]
@@ -105,7 +136,7 @@ def _build_ensemble(X: np.ndarray, y: np.ndarray, task: str, config: ModelConfig
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        ensemble.fit(X, y)
+        ensemble.fit(X, y, sample_weight=sample_weight)
     return ensemble
 
 

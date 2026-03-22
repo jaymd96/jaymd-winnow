@@ -35,6 +35,7 @@ class ModelConfig:
         "verbose": -1,
     })
     ensemble_weights: Optional[list[float]] = None
+    decay_halflife: Optional[int] = None  # steps; None = uniform weighting
     cv_folds: int = 5
     confidence_levels: list[float] = field(default_factory=lambda: [0.68, 0.95])
     conformal_method: str = "split"
