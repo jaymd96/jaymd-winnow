@@ -9,7 +9,7 @@ description = "Adaptive model lifecycle for financial signal selection and predi
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-authors = [{ name = "jaymd96-fmp" }]
+authors = [{ name = "jaymd96" }]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Financial and Insurance Industry",
@@ -36,8 +36,8 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/jaymd96-fmp/jaymd-winnow"
-Repository = "https://github.com/jaymd96-fmp/jaymd-winnow"
+Homepage = "https://github.com/jaymd96/jaymd-winnow"
+Repository = "https://github.com/jaymd96/jaymd-winnow"
 
 [tool.hatch.metadata]
 allow-direct-references = true
