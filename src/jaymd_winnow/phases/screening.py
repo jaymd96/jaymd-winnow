@@ -27,6 +27,7 @@ def screen_features(
     Returns:
         selected_indices: Column indices into X of selected features, shape (n_selected,).
     """
+    y = np.asarray(y).ravel()  # ensure 1D
     selected, scores = stability_selection(
         X, y,
         task=task,

@@ -46,7 +46,12 @@ def _fit_subsample(
                 max_iter=5000,
             )
             model.fit(X_scaled, y_sub)
-            coefs = model.coef_.ravel()
+            coefs = model.coef_
+            # Multiclass: coef_ shape is (n_classes, n_features) — aggregate
+            if coefs.ndim == 2:
+                coefs = np.abs(coefs).max(axis=0)
+            else:
+                coefs = coefs.ravel()
 
     return np.abs(coefs) > 1e-10
 
